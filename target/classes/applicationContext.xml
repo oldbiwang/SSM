@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context" 
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+    	 	http://www.springframework.org/schema/context
+    		http://www.springframework.org/schema/context/spring-context.xsd
+    		http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+    	    http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+        
+	  <context:component-scan base-package="com.atguigu">
+	  	<!-- 不扫描控制器 -->
+	  	<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller" />
+	  </context:component-scan>
+
+	 <!-- Spring 的配置文件，这里主要配置和业务逻辑有关的  -->
+  	<!-- 数据源、事务控制 -->
+  	<context:property-placeholder location="classpath:dbconfig.properties" />
+  	
+  	<bean id="pooledDataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+  		<property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+  		<property name="driverClass" value="${jdbc.driverClass}"></property>
+  		<property name="user" value="${jdbc.user}"></property>
+  		<property name="password" value="${jdbc.password}"></property>
+  	</bean>
+
+    <!-- 配置和 MyBatis 整合 -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    	<property name="configLocation" value="classpath:mybatis-config.xml"></property>
+  		<property name="dataSource" ref="pooledDataSource" />
+  		<property name="mapperLocations" value="classpath:mapper/*.xml" />
+	</bean>
+
+	<!-- 配置扫描器，将mybatis 接口的实现加入到 IOC 容器中 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+  		<property name="basePackage" value="com.atguigu.crud.dao" />
+	</bean>
+	
+
+	<!-- 配置一个可以批量操作的 sqlSession -->
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactory"></constructor-arg>
+		<constructor-arg name="executorType" value="BATCH"></constructor-arg>
+	</bean>
+
+	<!-- 事务控制 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+  		<property name="dataSource" ref="pooledDataSource" />
+	</bean>
+	
+	<!-- 开启基于注解的事务 -->
+	<aop:config>
+		<aop:pointcut expression="execution(* com.atguigu.crud.service..*(..))" id="txPoint"/>
+		<aop:advisor advice-ref="txAdvice"  pointcut-ref="txPoint"/>
+	</aop:config>
+	
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="*" />
+			<tx:method name="get" read-only="true" />
+		</tx:attributes>
+	</tx:advice>
+</beans>
